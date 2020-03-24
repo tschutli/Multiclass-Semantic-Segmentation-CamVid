@@ -5,11 +5,13 @@ Created on Tue Mar 24 11:00:59 2020
 @author: johan
 """
 
+import os
+#os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
 import constants
 import utils
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 import re
 from PIL import Image
 import shutil
@@ -265,7 +267,7 @@ def ValAugmentGenerator(val_frames_dir,val_masks_dir,classes, seed = 1, batch_si
 
 
 
-def get_small_unet(n_filters = 16, bn = True, dilation_rate = 1, num_classes=20):
+def get_small_unet(n_filters = 16, bn = True, dilation_rate = 1, num_classes=20, batch_size=5):
     '''Validation Image data generator
         Inputs: 
             n_filters - base convolution filters
@@ -274,9 +276,8 @@ def get_small_unet(n_filters = 16, bn = True, dilation_rate = 1, num_classes=20)
         Output: Unet keras Model
     '''
     #Define input batch shape
-    batch_shape=(256,256,3)
-    inputs = Input(batch_shape=(5, 256, 256, 3))
-    print(inputs)
+    inputs = Input(batch_shape=(batch_size, 256, 256, 3))
+    
     
     conv1 = Conv2D(n_filters * 1, (3, 3), activation='relu', padding = 'same', dilation_rate = dilation_rate)(inputs)
     if bn:
@@ -411,7 +412,7 @@ def dice_coef_loss(y_true, y_pred):
 
 
 
-def run(working_dir=constants.working_dir, splits=constants.splits):
+def run(working_dir=constants.working_dir, splits=constants.splits, batch_size=3):
     x = tf.random.uniform([3, 3])
 
     print("Is there a GPU available: "),
@@ -442,7 +443,7 @@ def run(working_dir=constants.working_dir, splits=constants.splits):
     
     classes = utils.load_obj(os.path.join(working_dir,"labelmap.pkl"))
         
-    model = get_small_unet(n_filters = 32,num_classes=len(classes))
+    model = get_small_unet(n_filters = 32,num_classes=len(classes),batch_size=batch_size)
 
     model.compile(optimizer='adam', loss="categorical_crossentropy", metrics=[tversky_loss,dice_coef,'accuracy'])
 
@@ -456,19 +457,14 @@ def run(working_dir=constants.working_dir, splits=constants.splits):
     es = EarlyStopping(mode='max', monitor='val_accuracy', patience=10, verbose=1)
     callbacks = [tb, mc, es]
     
-    batch_size = 5
     steps_per_epoch = np.ceil(float(len(frames_list) - round(0.1*len(frames_list))) / float(batch_size))
     validation_steps = np.ceil(float((round(0.1*len(frames_list)))) / float(batch_size))
     
     num_epochs = 100
-    
-    print(validation_steps)
-    print(steps_per_epoch)
-    
-    
-    result = model.fit_generator(TrainAugmentGenerator(train_frames_dir,train_masks_dir,classes), steps_per_epoch=int(steps_per_epoch) ,
-                    validation_data = ValAugmentGenerator(val_frames_dir,val_masks_dir,classes), 
-                    validation_steps = validation_steps, epochs=num_epochs, callbacks=callbacks)
+        
+    result = model.fit_generator(TrainAugmentGenerator(train_frames_dir,train_masks_dir,classes,batch_size=batch_size), steps_per_epoch=int(steps_per_epoch) ,
+                    validation_data = ValAugmentGenerator(val_frames_dir,val_masks_dir,classes,batch_size=batch_size), 
+                    validation_steps = int(validation_steps), epochs=num_epochs, callbacks=callbacks)
     model.save_weights(model_save_path, overwrite=True)
     
     
