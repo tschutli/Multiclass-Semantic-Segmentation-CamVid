@@ -11,6 +11,7 @@ import gdal
 import numpy as np
 import osr
 import pyproj
+import pickle
 
 
 class GeoInformation(object):
@@ -23,6 +24,17 @@ class GeoInformation(object):
         else:
             for key in dictionary:
                 setattr(self, key, dictionary[key])
+
+
+def save_obj(obj, path ):
+    with open(path, 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+def load_obj(path):
+    with open(path, 'rb') as f:
+        return pickle.load(f)
+
+
 
 
 def get_all_image_paths_in_folder(folder_path):
@@ -43,41 +55,59 @@ def get_all_image_paths_in_folder(folder_path):
             images.append(os.path.join(folder_path, file))
     return images
 
-def get_color_for_class_id(class_id):
-    colors = [(64, 128, 64),
-              (192, 0, 128),
-              (0, 128, 192),
-              (0, 128, 64),
-              (128, 0, 0),
-              (64, 0, 128),
-              (64, 0, 192),
-              (192, 128, 64),
-              (192, 192, 128),
-              (64, 64, 128),
-              (128, 0, 192),
-              (192, 0, 64),
-              (128, 128, 64),
-              (192, 0, 192),
-              (128, 64, 64),
-              (64, 192, 128),
-              (64, 64, 0),
-              (128, 64, 128),
-              (128, 128, 192),
-              (0, 0, 192),
-              (192, 128, 128),
-              (128, 128, 128),
-              (64, 128, 192),
-              (0, 0, 64),
-              (0, 64, 64),
-              (192, 64, 128),
-              (128, 128, 0),
-              (192, 128, 192),
-              (64, 0, 64),
-              (192, 192, 0),
-              (0, 0, 0),
-              (64, 192, 0)]
-    return colors[class_id%len(colors)]
-    
+colors = [(64, 128, 64),
+          (192, 0, 128),
+          (0, 128, 192),
+          (0, 128, 64),
+          (128, 0, 0),
+          (64, 0, 128),
+          (64, 0, 192),
+          (192, 128, 64),
+          (192, 192, 128),
+          (64, 64, 128),
+          (128, 0, 192),
+          (192, 0, 64),
+          (128, 128, 64),
+          (192, 0, 192),
+          (128, 64, 64),
+          (64, 192, 128),
+          (64, 64, 0),
+          (128, 64, 128),
+          (128, 128, 192),
+          (0, 0, 192),
+          (192, 128, 128),
+          (128, 128, 128),
+          (64, 128, 192),
+          (0, 0, 64),
+          (0, 64, 64),
+          (192, 64, 128),
+          (128, 128, 0),
+          (192, 128, 192),
+          (64, 0, 64),
+          (192, 192, 0),
+          (0, 0, 0),
+          (64, 192, 0)]
+
+
+def name2id(classes, name):
+    return classes.index(name)
+
+def id2name(classes,idx):
+    return classes[idx]
+
+def id2color(classes,idx):
+    if idx >= len(colors):
+        print("WARNING: TOO FEW COLORS DEFINED TO HANDLE SO MANY CLASSES")
+    return colors[idx%len(colors)]
+
+def color2id(classes,color):
+    return colors.index(color)    
+
+def name2color(classes,name):
+    return id2color(classes,name2id(classes,name))
+
+def color2name(classes,color):
+    return id2name(classes,color2id(classes,color))
 
 def delete_folder_contents(folder_path):
     """Deletes all files and subfolders within a folder

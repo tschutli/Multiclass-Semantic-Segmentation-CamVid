@@ -14,14 +14,11 @@ from shapely.geometry import Polygon, MultiPolygon, LinearRing
 from PIL import Image, ImageDraw
 import numpy as np
 import shutil
+import constants
 
-EPSG_TO_WORK_WITH = 2056
+EPSG_TO_WORK_WITH = constants.EPSG_TO_WORK_WITH
 
-classes = []
-
-
-def get_class_id_for_class_name(class_name):
-    return classes.index(class_name)+1
+classes = ["Background"]
 
 
 def get_all_polygons_from_shapefile(project_dir):
@@ -118,10 +115,10 @@ def make_mask_image(image_path, mask_image_path, all_polygons):
     # read image as RGB(A)
     img_array = utils.get_image_array(image_path)
     # create new image ("1-bit pixels, black and white", (width, height), "default color")
-    mask_img = Image.new("RGB", (img_array.shape[1], img_array.shape[0]), utils.get_color_for_class_id(0) )
+    mask_img = Image.new("RGB", (img_array.shape[1], img_array.shape[0]), utils.name2color(classes,"Background"))
     
     for polygon in all_polygons:
-        color = utils.get_color_for_class_id(get_class_id_for_class_name(polygon["class_label"]))
+        color = utils.name2color(classes,polygon["class_label"])
         ImageDraw.Draw(mask_img).polygon(polygon["polygon"], outline=color, fill=color)
         #TODO: Inner polygon
 
@@ -129,12 +126,11 @@ def make_mask_image(image_path, mask_image_path, all_polygons):
     
     if (img_array.shape[2] == 4):
         alpha_mask = img_array[:,:,3] / 255
-        print(alpha_mask[5000,3000])
         
         # filtering image by mask
-        mask[:,:,0] = mask[:,:,0] * alpha_mask + utils.get_color_for_class_id(0)[0] * (1-alpha_mask)
-        mask[:,:,1] = mask[:,:,1] * alpha_mask + utils.get_color_for_class_id(0)[1] * (1-alpha_mask)
-        mask[:,:,2] = mask[:,:,2] * alpha_mask + utils.get_color_for_class_id(0)[2] * (1-alpha_mask)
+        mask[:,:,0] = mask[:,:,0] * alpha_mask + utils.name2color(classes,"Background")[0] * (1-alpha_mask)
+        mask[:,:,1] = mask[:,:,1] * alpha_mask + utils.name2color(classes,"Background")[1] * (1-alpha_mask)
+        mask[:,:,2] = mask[:,:,2] * alpha_mask + utils.name2color(classes,"Background")[2] * (1-alpha_mask)
     
     
     
@@ -173,7 +169,7 @@ def convert_polygon_coords_to_pixel_coords(all_polygons, image_path):
 
 
 
-def tile_image(image_path, output_folder, tile_size=256, overlap=10):
+def tile_image(image_path, output_folder,src_dir_index, tile_size=256, overlap=0):
     
     """Tiles the image and the annotations into square shaped tiles of size tile_size
         Requires the image to have either a tablet annotation file (imagename_annotations.json)
@@ -194,7 +190,7 @@ def tile_image(image_path, output_folder, tile_size=256, overlap=10):
     image_array = utils.get_image_array(image_path)
     height = image_array.shape[0]
     width = image_array.shape[1]
-    image_name = os.path.basename(image_path)
+    image_name = os.path.basename(image_path).replace("_mask.tif","").replace(".tif","")
     currentx = 0
     currenty = 0
     while currenty < height:
@@ -209,7 +205,7 @@ def tile_image(image_path, output_folder, tile_size=256, overlap=10):
             tile = Image.fromarray(cropped_array)
 
             #tile = image.crop((currentx,currenty,currentx + tile_size,currenty + tile_size))
-            output_image_path = os.path.join(output_folder, image_name + "_subtile_" + "x" + str(currentx) + "y" + str(currenty) + "size" + str(tile_size) + ".png")
+            output_image_path = os.path.join(output_folder,  image_name + "_src_dir" + str(src_dir_index)  + "_subtile_" + "x" + str(currentx) + "y" + str(currenty) + "_size" + str(tile_size) + ".png")
             tile.save(output_image_path,"PNG")
                         
             currentx += tile_size-overlap
@@ -218,7 +214,7 @@ def tile_image(image_path, output_folder, tile_size=256, overlap=10):
     
     
 
-def create_label_dictionary(shape_file_path):
+def add_shapefile_classes_to_label_dictionary(shape_file_path):
     all_polygons = get_all_polygons_from_shapefile(shape_file_path)
     
     for polygon in all_polygons:
@@ -244,45 +240,70 @@ def make_folders(project_dir):
     image_tiles_dir = os.path.join(training_data_dir,"images")
     os.makedirs(image_tiles_dir,exist_ok=True)
     
+    '''
+    val_mask_tiles_dir = os.path.join(training_data_dir,"val_masks")
+    os.makedirs(val_mask_tiles_dir,exist_ok=True)
+
+    val_image_tiles_dir = os.path.join(training_data_dir,"val_images")
+    os.makedirs(val_image_tiles_dir,exist_ok=True)
+    '''
+    
     return (temp_dir,mask_tiles_dir,image_tiles_dir)
 
 
-def run(project_dir="C:/Users/johan/Desktop/proj_dir"):
-    
-    shape_file_path = os.path.join(project_dir,"shapes/shapes.shp")
-    create_label_dictionary(shape_file_path)
+
+
+
+def run(src_dirs=constants.data_source_folders, working_dir=constants.working_dir):
+    import datetime
+
+    print(datetime.datetime.now())
+    for src_dir_index,src_dir in enumerate(src_dirs):
+        shape_file_path = os.path.join(src_dir,"shapes/shapes.shp")
+        add_shapefile_classes_to_label_dictionary(shape_file_path)
     print(str(len(classes)) + " classes present in dataset")
     
+    utils.save_obj(classes,os.path.join(working_dir,"labelmap.pkl"))
     
+    print(datetime.datetime.now())
     
-    images_folder = os.path.join(project_dir,"images")
-    (temp_dir,mask_tiles_dir,image_tiles_dir) = make_folders(project_dir)
+    (temp_dir,mask_tiles_dir,image_tiles_dir) = make_folders(working_dir)
 
-    #for image in utils.get_all_image_paths_in_folder(images_folder):
-    for image_path in [os.path.join(images_folder + "/test.tif")]:
+    print(datetime.datetime.now())
+    
+    for src_dir_index,src_dir in enumerate(src_dirs):
+    
+        shape_file_path = os.path.join(src_dir,"shapes/shapes.shp")
         
-        #Change Coordinate System of Image if necessary      
-        proj = osr.SpatialReference(wkt=gdal.Open(image_path).GetProjection())
-        epsg_code_of_image = proj.GetAttrValue('AUTHORITY',1)
-        if epsg_code_of_image != EPSG_TO_WORK_WITH:
-            projected_image_path = os.path.join(temp_dir,os.path.basename(image_path))
-            gdal.Warp(projected_image_path,image_path,dstSRS='EPSG:'+str(EPSG_TO_WORK_WITH))
-            image_path = projected_image_path
+        images_folder = os.path.join(src_dir,"images")
+        
+        for image_path in utils.get_all_image_paths_in_folder(images_folder):
             
+            #Change Coordinate System of Image if necessary      
+            proj = osr.SpatialReference(wkt=gdal.Open(image_path).GetProjection())
+            epsg_code_of_image = proj.GetAttrValue('AUTHORITY',1)
+            if epsg_code_of_image != EPSG_TO_WORK_WITH:
+                projected_image_path = os.path.join(temp_dir,os.path.basename(image_path))
+                gdal.Warp(projected_image_path,image_path,dstSRS='EPSG:'+str(EPSG_TO_WORK_WITH))
+                image_path = projected_image_path
+            print(datetime.datetime.now())
+                
+            mask_image_path = os.path.join(temp_dir,os.path.basename(image_path).replace(".tif","_mask.tif"))
             
-        mask_image_path = os.path.join(temp_dir,os.path.basename(image_path).replace(".tif","_mask.tif"))
+            all_polygons = get_all_polygons_from_shapefile(shape_file_path)
+            all_polygons = convert_polygon_coords_to_pixel_coords(all_polygons,image_path)        
+            print(datetime.datetime.now())
+            make_mask_image(image_path,mask_image_path,all_polygons)
+            print(datetime.datetime.now())
+            tile_image(mask_image_path,mask_tiles_dir,src_dir_index)
+            print(datetime.datetime.now())
+            tile_image(image_path,image_tiles_dir,src_dir_index)
+            print(datetime.datetime.now())
+            
         
-        all_polygons = get_all_polygons_from_shapefile(shape_file_path)
-        all_polygons = convert_polygon_coords_to_pixel_coords(all_polygons,image_path)        
+        #split_train_dir(image_tiles_dir, mask_tiles_dir, val_image_tiles_dir, val_mask_tiles_dir)
         
-        make_mask_image(image_path,mask_image_path,all_polygons)
-
-        tile_image(mask_image_path,mask_tiles_dir)
-        tile_image(image_path,image_tiles_dir)
-
-    
-    
-    utils.delete_folder_contents(temp_dir)
+        utils.delete_folder_contents(temp_dir)
     shutil.rmtree(temp_dir)
 
     
