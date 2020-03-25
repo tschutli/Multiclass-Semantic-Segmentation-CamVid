@@ -453,9 +453,9 @@ def run(working_dir=constants.working_dir, splits=constants.splits, batch_size=c
     
     model_save_path = os.path.join(working_dir,"trained_model.h5")
 
-    tb = TensorBoard(log_dir='logs', write_graph=True)
-    mc = ModelCheckpoint(mode='max', filepath=model_save_path, monitor='accuracy', save_best_only='True', save_weights_only='True', verbose=1)
-    es = EarlyStopping(mode='max', monitor='val_accuracy', patience=10, verbose=1)
+    tb = TensorBoard(log_dir=os.path.join(working_dir,"logs"), write_graph=True)
+    mc = ModelCheckpoint(mode='max', filepath=model_save_path, monitor='val_acc', save_best_only='True', save_weights_only='True', verbose=1)
+    es = EarlyStopping(mode='max', monitor='val_acc', patience=10, verbose=1)
     callbacks = [tb, mc, es]
     
     steps_per_epoch = np.ceil(float(len(frames_list) - round(0.1*len(frames_list))) / float(batch_size))
