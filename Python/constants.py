@@ -6,7 +6,7 @@ Created on Tue Mar 24 12:04:32 2020
 """
 
 data_source_folders = [
-        "C:/Users/johan/Desktop/src_folder2"
+        "G:/Johannes/Semantic segmentation/src_dir1"
         ]
 
 splits = [
@@ -14,7 +14,8 @@ splits = [
         ]
 
 
-working_dir = "C:/Users/johan/Desktop/working_dir"
+working_dir = "G:/Johannes/Semantic segmentation/working_dir"
 
 EPSG_TO_WORK_WITH = 2056
 
+batch_size = 18

@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import re
 from PIL import Image
 import shutil
+import progressbar
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -412,7 +413,7 @@ def dice_coef_loss(y_true, y_pred):
 
 
 
-def run(working_dir=constants.working_dir, splits=constants.splits, batch_size=3):
+def run(working_dir=constants.working_dir, splits=constants.splits, batch_size=constants.batch_size):
     x = tf.random.uniform([3, 3])
 
     print("Is there a GPU available: "),
