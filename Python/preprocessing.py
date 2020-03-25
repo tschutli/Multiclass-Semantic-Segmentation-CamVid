@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw
 import numpy as np
 import shutil
 import constants
+import progressbar
 
 EPSG_TO_WORK_WITH = constants.EPSG_TO_WORK_WITH
 
@@ -255,9 +256,7 @@ def make_folders(project_dir):
 
 
 def run(src_dirs=constants.data_source_folders, working_dir=constants.working_dir):
-    import datetime
 
-    print(datetime.datetime.now())
     for src_dir_index,src_dir in enumerate(src_dirs):
         shape_file_path = os.path.join(src_dir,"shapes/shapes.shp")
         add_shapefile_classes_to_label_dictionary(shape_file_path)
@@ -265,11 +264,9 @@ def run(src_dirs=constants.data_source_folders, working_dir=constants.working_di
     
     utils.save_obj(classes,os.path.join(working_dir,"labelmap.pkl"))
     
-    print(datetime.datetime.now())
     
     (temp_dir,mask_tiles_dir,image_tiles_dir) = make_folders(working_dir)
 
-    print(datetime.datetime.now())
     
     for src_dir_index,src_dir in enumerate(src_dirs):
     
@@ -277,7 +274,8 @@ def run(src_dirs=constants.data_source_folders, working_dir=constants.working_di
         
         images_folder = os.path.join(src_dir,"images")
         
-        for image_path in utils.get_all_image_paths_in_folder(images_folder):
+        print("Tiling all images in input folder: " + src_dir)
+        for image_path in progressbar.progressbar(utils.get_all_image_paths_in_folder(images_folder)):
             
             #Change Coordinate System of Image if necessary      
             proj = osr.SpatialReference(wkt=gdal.Open(image_path).GetProjection())
@@ -286,19 +284,14 @@ def run(src_dirs=constants.data_source_folders, working_dir=constants.working_di
                 projected_image_path = os.path.join(temp_dir,os.path.basename(image_path))
                 gdal.Warp(projected_image_path,image_path,dstSRS='EPSG:'+str(EPSG_TO_WORK_WITH))
                 image_path = projected_image_path
-            print(datetime.datetime.now())
                 
             mask_image_path = os.path.join(temp_dir,os.path.basename(image_path).replace(".tif","_mask.tif"))
             
             all_polygons = get_all_polygons_from_shapefile(shape_file_path)
             all_polygons = convert_polygon_coords_to_pixel_coords(all_polygons,image_path)        
-            print(datetime.datetime.now())
             make_mask_image(image_path,mask_image_path,all_polygons)
-            print(datetime.datetime.now())
             tile_image(mask_image_path,mask_tiles_dir,src_dir_index)
-            print(datetime.datetime.now())
             tile_image(image_path,image_tiles_dir,src_dir_index)
-            print(datetime.datetime.now())
             
         
         #split_train_dir(image_tiles_dir, mask_tiles_dir, val_image_tiles_dir, val_mask_tiles_dir)
