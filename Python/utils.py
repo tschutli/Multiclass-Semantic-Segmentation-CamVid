@@ -189,3 +189,4 @@ def get_geo_coordinates(input_image, epsg_code=2056):
         return geo_info
     except RuntimeError:
         return None
+    
